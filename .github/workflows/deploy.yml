@@ -6,7 +6,7 @@ on:
 
 env:
   ACR_NAME: acrprojectapp.azurecr.io
-  APP_NAME: web-app-project-dkajc3bkacggg8dw
+  APP_NAME: web-app-project
   RESOURCE_GROUP: rg-project-app
 
 jobs:
