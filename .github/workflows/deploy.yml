@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
 
+# Global environment variables accessible by EVERY job below
 env:
   ACR_NAME: acrprojectapp.azurecr.io
   APP_NAME: web-app-project
   RESOURCE_GROUP: rg-project-app
-  # This matches the exact Default Domain from your Azure Portal screenshot
   STAGING_URL: "web-app-project-staging-c9g7g5fpbab3erfy.centralus-01.azurewebsites.net"
 
 jobs:
