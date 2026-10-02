@@ -32,13 +32,16 @@ jobs:
       - run: npm ci --omit=dev
       - run: zip -r release.zip . -x ".git/*" ".github/*"
 
-      - name: Deploy to STAGING slot
-        uses: azure/webapps-deploy@v3
+      - name: Azure login
+        uses: azure/login@v2
         with:
-          app-name: ${{ env.APP_NAME }}
-          slot-name: staging                      # fixed: was "production"
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          package: release.zip
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to STAGING slot
+        run: |
+          az webapp deploy --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.APP_NAME }} --slot staging \
+            --src-path release.zip --type zip
 
       - name: Health check staging
         run: |
