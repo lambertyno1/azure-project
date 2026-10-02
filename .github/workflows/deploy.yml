@@ -6,49 +6,41 @@ on:
 
 env:
   ACR_NAME: acrprojectapp.azurecr.io
-  APP_NAME: web-app-project-dkajc3bkacggg8dw  # <-- FIXED: Full app name
+  APP_NAME: web-app-project
   RESOURCE_GROUP: rg-project-app
 
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm test   # real tests — this actually fails the job if something's broken
 
-      - name: Run Tests
-        run: echo "Running automated tests..."
-
-  build-and-push:
+  deploy-staging:
     needs: build-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-
-      - name: Login to ACR
-        uses: azure/docker-login@v1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          login-server: ${{ env.ACR_NAME }}
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+          node-version: 20
+      - run: npm ci --omit=dev
+      - run: zip -r release.zip . -x ".git/*" ".github/*"
 
-      - name: Build and push Docker image
-        run: |
-          docker build -t ${{ env.ACR_NAME }}/app:${{ github.sha }} .
-          docker push ${{ env.ACR_NAME }}/app:${{ github.sha }}
-
-  deploy-staging:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Staging Slot
+      - name: Deploy to STAGING slot
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.APP_NAME }}
-          slot-name: staging
+          slot-name: staging                      # fixed: was "production"
           publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-          images: '${{ env.ACR_NAME }}/app:${{ github.sha }}'
+          package: release.zip
 
-      - name: Health Check
+      - name: Health check staging
         run: |
           sleep 30
           curl -f https://${{ env.APP_NAME }}-staging.azurewebsites.net/health || exit 1
@@ -57,12 +49,17 @@ jobs:
     needs: deploy-staging
     runs-on: ubuntu-latest
     steps:
-      - name: Azure Login
+      - name: Azure CLI login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-      - name: Swap Staging to Production
+          creds: ${{ secrets.AZURE_CREDENTIALS }}   # fixed: needs a service-principal JSON, not the publish profile
+
+      - name: Swap staging -> production
         uses: azure/cli@v2
         with:
           inlineScript: |
-            az webapp deployment slot swap --name ${{ env.APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --slot staging --target-slot production
+            az webapp deployment slot swap \
+              --name ${{ env.APP_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP }} \
+              --slot staging \
+              --target-slot production
