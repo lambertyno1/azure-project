@@ -8,6 +8,8 @@ env:
   ACR_NAME: acrprojectapp.azurecr.io
   APP_NAME: web-app-project
   RESOURCE_GROUP: rg-project-app
+  # This matches the exact Default Domain from your Azure Portal screenshot
+  STAGING_URL: "web-app-project-staging-c9g7g5fpbab3erfy.centralus-01.azurewebsites.net"
 
 jobs:
   build-and-test:
@@ -36,12 +38,9 @@ jobs:
           docker build -t ${{ env.ACR_NAME }}/app:${{ github.sha }} .
           docker push ${{ env.ACR_NAME }}/app:${{ github.sha }}
 
-    deploy-staging:
+  deploy-staging:
     needs: build-and-push
     runs-on: ubuntu-latest
-    env:
-      # Copy-pasted exactly from your Azure screenshot
-      STAGING_URL: "web-app-project-staging-c9g7g5fpbab3erfy.centralus-01.azurewebsites.net"
     steps:
       - name: Azure Login
         uses: azure/login@v2
@@ -57,10 +56,9 @@ jobs:
 
       - name: Health Check
         run: |
-          echo "Waiting for container startup..."
+          echo "Waiting for container startup and DNS routing..."
           sleep 90
           curl -f --retry 5 --retry-delay 15 --retry-connrefused https://${{ env.STAGING_URL }}/health || exit 1
-
 
   swap-to-production:
     needs: deploy-staging
@@ -76,3 +74,4 @@ jobs:
         with:
           inlineScript: |
             az webapp deployment slot swap --name ${{ env.APP_NAME }} --resource-group ${{ env.RESOURCE_GROUP }} --slot staging --target-slot production
+
